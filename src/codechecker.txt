@@ -1,0 +1,36 @@
+#include <Wire.h>
+#include <Arduino.h>
+
+void setup() {
+  // Turn on ESP32's internal pull-up resistors to help stabilize the line
+  pinMode(21, INPUT_PULLUP);
+  pinMode(22, INPUT_PULLUP);
+  
+  Wire.begin(21, 22); 
+  Wire.setClock(10000); // Slow down the I2C clock to 10kHz (Default is 100kHz)
+  
+  Serial.begin(115200);
+  Serial.println("\nSlow & Stable I2C Scanner Starting...");
+}
+
+void loop() {
+  byte error, address;
+  int nDevices = 0;
+  Serial.println("Scanning bus...");
+  
+  for(address = 1; address < 127; address++ ) {
+    Wire.beginTransmission(address);
+    error = Wire.endTransmission();
+    
+    if (error == 0) {
+      Serial.print("SUCCESS! I2C device found at address 0x");
+      if (address < 16) Serial.print("0");
+      Serial.println(address, HEX);
+      nDevices++;
+    }
+  }
+  
+  if (nDevices == 0) Serial.println("FAILED. No I2C devices found.");
+  Serial.println("-------------------------");
+  delay(2000); 
+}

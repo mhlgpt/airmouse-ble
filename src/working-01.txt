@@ -1,0 +1,66 @@
+#include <Arduino.h>
+#include <Wire.h>
+#include <MPU6500_WE.h>
+#include <BleMouse.h>
+
+#define I2C_SDA 26
+#define I2C_SCL 27
+#define SENSOR_ADDR 0x68 // Adjust to 0x69 if needed
+
+// Use the 6500 object instead of the 9250
+MPU6500_WE mySensor = MPU6500_WE(&Wire, SENSOR_ADDR);
+BleMouse bleMouse("ESP32 Air Mouse", "YourName", 100);
+
+void setup() {
+  Serial.begin(115200);
+  while (!Serial);
+
+  // Start I2C and keep it stable at 100kHz
+  Wire.begin(I2C_SDA, I2C_SCL);
+  Wire.setClock(100000); 
+
+  Serial.println("\nChecking for MPU-6500...");
+  
+  // Initialize the sensor
+  if (!mySensor.init()) {
+    Serial.println("ERROR: Sensor failed to initialize.");
+    while (1) { delay(100); } 
+  }
+
+  Serial.println("MPU-6500 detected successfully!");
+  
+  Serial.println("Calibrating gyroscopes (LEAVE FLAT FOR 2 SECONDS)...");
+  mySensor.autoOffsets(); 
+  
+  Serial.println("Starting Bluetooth...");
+  bleMouse.begin();
+  Serial.println("Bluetooth is ON! Search for 'ESP32 Air Mouse' on your PC/Phone.");
+}
+
+void loop() {
+  if (bleMouse.isConnected()) {
+    
+    // Read the gyroscope data
+    xyzFloat gyroData = mySensor.getGyrValues();
+
+    float deadzone = 2.5; 
+    int moveX = 0;
+    int moveY = 0;
+
+    // Map Z-axis rotation to horizontal mouse movement
+    if (abs(gyroData.z) > deadzone) {
+      moveX = (int)(gyroData.z / 2.0); 
+    }
+    
+    // Map X-axis rotation to vertical mouse movement
+    if (abs(gyroData.x) > deadzone) {
+      moveY = (int)(gyroData.x / 2.0); 
+    }
+
+    if (moveX != 0 || moveY != 0) {
+      bleMouse.move(moveX, moveY);
+    }
+  }
+  
+  delay(20); 
+}

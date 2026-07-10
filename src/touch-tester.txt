@@ -1,0 +1,37 @@
+#include <Arduino.h> // Required for VS Code/PlatformIO
+
+// Define the pins
+const int touchPin = 21; // GPIO 4 connected to the I/O pin of the HW-763
+const int ledPin = 2;   // GPIO 2 for the ESP32's onboard blue LED
+
+// Variable to store the current state of the touch sensor
+int touchState = 0;
+
+void setup() {
+  // Initialize serial communication for debugging 
+  Serial.begin(115200);
+  
+  // Set the touch sensor pin as an input
+  pinMode(touchPin, INPUT);
+  
+  // Set the onboard LED pin as an output
+  pinMode(ledPin, OUTPUT);
+}
+
+void loop() {
+  // Read the state of the touch sensor
+  touchState = digitalRead(touchPin);
+  
+  // The HW-763 outputs HIGH when touched
+  if (touchState == HIGH) {
+    // Turn ON the onboard blue LED
+    digitalWrite(ledPin, HIGH);
+    Serial.println("Sensor touched! LED ON.");
+  } else {
+    // Turn OFF the onboard blue LED
+    digitalWrite(ledPin, LOW);
+  }
+  
+  // Add a tiny delay for stability
+  delay(50);
+}
