@@ -8,38 +8,41 @@
 #define I2C_SCL 27
 #define SENSOR_ADDR 0x68 
 
-// ESP32 Native Touch Pins
-#define PIN_LEFT_CLICK  2
-#define PIN_RIGHT_CLICK 15
-#define PIN_SCROLL_UP   13
-#define PIN_SCROLL_DOWN 14
-#define PIN_ACTIVATOR   12
-
-// --- TOUCH SENSITIVITY THRESHOLD ---
-// When untouched, touchRead usually returns ~50-70. 
-// When touched, it drops below ~30. Adjust this if it's too sensitive or not sensitive enough!
-const int TOUCH_THRESHOLD = 30;
+// HW-763 Touch Sensor Pins (UPDATED)
+#define PIN_LEFT_CLICK  13
+#define PIN_RIGHT_CLICK 14
+#define PIN_SCROLL_UP   25
+#define PIN_SCROLL_DOWN 33
+#define PIN_ACTIVATOR   32
 
 MPU6500_WE mySensor = MPU6500_WE(&Wire, SENSOR_ADDR);
 BleMouse bleMouse("ESP32 Air Mouse", "YourName", 100);
 
 // Click tracking
-bool lastLeftState = false;
-bool lastRightState = false;
+bool lastLeftState = LOW;
+bool lastRightState = LOW;
 
 // Scroll tracking
 unsigned long lastScrollTime = 0;
 const int scrollInterval = 100; 
 
-// Anti-jitter Filter Variables
+// --- ANTI-JITTER FILTER VARIABLES ---
 float smoothedZ = 0;
 float smoothedX = 0;
+// alpha determines smoothness. 0.1 is very smooth (but slight lag). 0.5 is very fast (but more jitter).
 const float filterAlpha = 0.2; 
-const float deadzone = 3.5; 
+const float deadzone = 3.5; // Increased slightly to ignore hand tremors
 
 void setup() {
   Serial.begin(115200);
   while (!Serial);
+
+  // Initialize Touch Pins
+  pinMode(PIN_LEFT_CLICK, INPUT);
+  pinMode(PIN_RIGHT_CLICK, INPUT);
+  pinMode(PIN_SCROLL_UP, INPUT);
+  pinMode(PIN_SCROLL_DOWN, INPUT);
+  pinMode(PIN_ACTIVATOR, INPUT);
 
   Wire.begin(I2C_SDA, I2C_SCL);
   Wire.setClock(100000); 
@@ -64,53 +67,59 @@ void loop() {
     int moveY = 0;
 
     // ==========================================
-    // 1. GYROSCOPE MOVEMENT (If Activator is touched)
+    // 1. GYROSCOPE MOVEMENT (Only if Activator is touched)
     // ==========================================
-    // touchRead returns a smaller number when your finger touches the pin
-    if (touchRead(PIN_ACTIVATOR) < TOUCH_THRESHOLD) {
+    if (digitalRead(PIN_ACTIVATOR) == HIGH) {
       xyzFloat gyroData = mySensor.getGyrValues();
 
+      // Apply Low-Pass Filter to smooth out the raw data
       smoothedZ = (gyroData.z * filterAlpha) + (smoothedZ * (1.0 - filterAlpha));
       smoothedX = (gyroData.x * filterAlpha) + (smoothedX * (1.0 - filterAlpha));
 
-      if (abs(smoothedZ) > deadzone) { moveX = (int)(smoothedZ / 2.0); }
-      if (abs(smoothedX) > deadzone) { moveY = (int)(smoothedX / 2.0); }
+      // Map Z-axis (twist) to horizontal movement
+      if (abs(smoothedZ) > deadzone) { 
+        moveX = (int)(smoothedZ / 2.0); 
+      }
       
+      // Map X-axis (tilt) to vertical movement
+      if (abs(smoothedX) > deadzone) { 
+        moveY = (int)(smoothedX / 2.0); 
+      }
     } else {
+      // If activator is released, instantly reset the filter to prevent drift when re-engaged
       smoothedZ = 0;
       smoothedX = 0;
     }
 
     // ==========================================
-    // 2. NATIVE TOUCH SENSOR CLICKS 
+    // 2. TOUCH SENSOR CLICKS 
     // ==========================================
-    // Convert the analog touch reading into a simple true/false boolean
-    bool currentLeftState = (touchRead(PIN_LEFT_CLICK) < TOUCH_THRESHOLD);
-    bool currentRightState = (touchRead(PIN_RIGHT_CLICK) < TOUCH_THRESHOLD);
+    bool currentLeftState = digitalRead(PIN_LEFT_CLICK);
+    bool currentRightState = digitalRead(PIN_RIGHT_CLICK);
 
-    if (currentLeftState == true && lastLeftState == false) {
+    if (currentLeftState == HIGH && lastLeftState == LOW) {
       bleMouse.press(MOUSE_LEFT);
-    } else if (currentLeftState == false && lastLeftState == true) {
+    } else if (currentLeftState == LOW && lastLeftState == HIGH) {
       bleMouse.release(MOUSE_LEFT);
     }
     lastLeftState = currentLeftState; 
 
-    if (currentRightState == true && lastRightState == false) {
+    if (currentRightState == HIGH && lastRightState == LOW) {
       bleMouse.press(MOUSE_RIGHT);
-    } else if (currentRightState == false && lastRightState == true) {
+    } else if (currentRightState == LOW && lastRightState == HIGH) {
       bleMouse.release(MOUSE_RIGHT);
     }
     lastRightState = currentRightState; 
 
     // ==========================================
-    // 3. NATIVE TOUCH SCROLLING
+    // 3. TOUCH SENSOR SCROLLING
     // ==========================================
     if (millis() - lastScrollTime > scrollInterval) {
       int scrollAmount = 0;
       
-      if (touchRead(PIN_SCROLL_UP) < TOUCH_THRESHOLD) {
+      if (digitalRead(PIN_SCROLL_UP) == HIGH) {
         scrollAmount = 1;
-      } else if (touchRead(PIN_SCROLL_DOWN) < TOUCH_THRESHOLD) {
+      } else if (digitalRead(PIN_SCROLL_DOWN) == HIGH) {
         scrollAmount = -1;
       }
 
