@@ -9,8 +9,8 @@
 #define SENSOR_ADDR 0x68 
 
 // ESP32 Native Touch Pins
-#define PIN_LEFT_CLICK  2
-#define PIN_RIGHT_CLICK 15
+#define PIN_LEFT_CLICK  32
+#define PIN_RIGHT_CLICK 33
 #define PIN_SCROLL_UP   13
 #define PIN_SCROLL_DOWN 14
 #define PIN_ACTIVATOR   12
@@ -18,10 +18,10 @@
 // --- TOUCH SENSITIVITY THRESHOLD ---
 // When untouched, touchRead usually returns ~50-70. 
 // When touched, it drops below ~30. Adjust this if it's too sensitive or not sensitive enough!
-const int TOUCH_THRESHOLD = 30;
+const int TOUCH_THRESHOLD = 50;
 
 MPU6500_WE mySensor = MPU6500_WE(&Wire, SENSOR_ADDR);
-BleMouse bleMouse("ESP32 Air Mouse", "YourName", 100);
+BleMouse bleMouse("Air Mouse", "MMA", 100);
 
 // Click tracking
 bool lastLeftState = false;
